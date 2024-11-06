@@ -73,7 +73,7 @@ graf_2 <- ggplot(esclerosis, aes(x = mes, y = afcr, color = grupo)) +
 gridExtra::grid.arrange(graf_1, graf_2, ncol = 2, nrow = 1)
 ```
 
-Se observa mucha variabilidad ENTRE individuos y paraceria haber variancias similares entre ambos grupos. Además las tendencias cambian después del mes 3 (grupo 1 subem grupo 2 baja); si bien los valores de AFCR medio para el grupo 1 (solo azatioprina) son mayores que para grupo 2, ambos grupos tienen una tendencia lineal decreciente.
+Se observa mucha variabilidad INTRA individuos (se observan mucho picos) y paraceria haber variancias similares entre ambos grupos. Además las tendencias cambian después del mes 3 (grupo 1 subem grupo 2 baja); si bien los valores de AFCR medio para el grupo 1 (solo azatioprina) son mayores que para grupo 2, ambos grupos tienen una tendencia lineal decreciente.
 El cambio parecería ser igual en mabos grupos, exceptuando el mes 15 que el AFCR decrece más para el grupo de pacientes que recibió azatioprina y metilprednisona.
 
 
@@ -90,8 +90,17 @@ ggplot(esclerosis, aes(x = factor(mes), y = afcr, color = grupo)) +
         axis.title = element_text(size = 12),
         legend.position = 'bottom')
 ```
-La variancia parece ser menor a medida que los meses pasan.
+La variancia parece ser menor a medida que los meses pasan pero no pareciera diferir tanto entre los grupos.
 
+
+```{r}
+# Grafico de Draftman: No cre que debamos mostrarlo es solo para darnos una mejor idea de como son las correlaciones entre los tiempos de medición.
+escl_1_est <- data.frame(scale(esc_1[5:11]))
+GGally::ggpairs(escl_1_est)
+
+escl_2_est <- data.frame(scale(esc_2[5:11]))
+GGally::ggpairs(escl_2_est)
+```
 
 ```{r}
 # Estandarizo: 
@@ -182,7 +191,7 @@ ac_grupo2 <- data.frame(rezago = seq(0,18, 3),
 correlog <- rbind(ac_grupo1, ac_grupo2)
 
 # Gráfico
-ggplot(correlog, aes(x = rezago, y = ac, group = grupo, color = grupo)) +
+graf_3 <- ggplot(correlog, aes(x = rezago, y = ac, group = grupo, color = grupo)) +
   geom_point(size = 2) +
   geom_line(size = 1) +
   scale_x_continuous("Rezago", breaks = seq(0, 18, 3)) +
@@ -209,7 +218,7 @@ esclerosis <- mutate(esclerosis, residuos = m_media$residuals)
 vgm <- variogram(esclerosis$id, esclerosis$mes, esclerosis$residuos)
 vgm1 = data.frame(vgm$svar)
 
-ggplot(data = vgm1, aes(x = vt, y = vv)) +
+graf_4 <- ggplot(data = vgm1, aes(x = vt, y = vv)) +
   geom_point(color = 'grey50', na.rm = TRUE) +
   stat_summary(fun = mean, geom = 'line', color = 'orangered', size = 1, na.rm = TRUE) + 
   geom_hline(yintercept = vgm$sigma2) +
@@ -217,5 +226,21 @@ ggplot(data = vgm1, aes(x = vt, y = vv)) +
   scale_y_continuous("Variograma muestral") +
   labs(title = "Variograma muestral") +
   theme(plot.title = element_text(size = 15))
+
+gridExtra::grid.arrange(graf_3, graf_4, ncol = 1, nrow = 2)
+
 ```
+Se puede ver que hay mucho error de medición (dado que el inicio de $\hat{\gamma}(u)$ está demasiado alejado del origen), poca variabilidad entre individuos y, viendo tanto el variograma como el correlograma, podemos decir que hay muy poca correlación serial.
+
+
+PROPUESTA DE MODELOS: 
+1_ ordenada aleatoria y $R_i = \sigma^2_k \cdot I$ ya que refleja la predominancia del error de medición (k = 1,2 según el grupo), además podemos poner variancias heterogeneas en el tiempo (ya que no tenemos pendiente aleat.)
+
+2_ ordenada aleatoria y $R_i = \sigma^2 \cdot I$ (variancia común entre grupos), poner variancias heterogeneas en el tiempo
+
+3_ ordenada y pendiente aleatorias y $R_i = \sigma^2_k \cdot I$ con k = 1, 2
+
+4_ ordenada y pendiente aleatorias y $R_i = \sigma^2 \cdot I$
+
+Despues comparariamos todos según su valor de AIC o a través del test de razón de verosimilitud (todos están anidados)
 
