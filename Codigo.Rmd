@@ -1,0 +1,221 @@
+---
+title: "Trabajo Práctico"
+author: "Ro Canteros"
+date: "2024-11-05"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+## Paquetes utilizados
+library(readxl)
+library(tidyverse)
+library(nlme)
+library(joineR)
+
+# Carga de datos
+esclerosis <- read_xlsx("esclerosisMultiple.xlsx")
+
+# Modificaciones
+esclerosis <- esclerosis %>% 
+  mutate(id = factor(id),
+         previo = factor(previo),
+         edad = factor(edad),
+         grupo = factor(grupo))
+levels(esclerosis$previo) = c("No", "Si")
+levels(esclerosis$edad) = c("50 años o menos", "Más de 50 años")
+
+# Formato ancho
+esclerosis_a <- esclerosis %>% 
+  spread(key = "mes", value = "afcr") 
+
+# Tema: fijo un tema para todos los gráficos que se hagan
+theme_set(theme_bw())
+```
+
+
+## Análisis descriptivo
+
+```{r}
+### Perfiles individuales
+graf_1 <- ggplot(esclerosis, aes(x = mes, y = afcr, group = id, color = grupo)) +
+  geom_line(show.legend = FALSE) +
+  geom_point(show.legend = FALSE) +
+  facet_wrap(~ grupo) +
+  scale_x_continuous("Mes", breaks = seq(0, 18, 3)) +
+  scale_y_continuous("Medida de autoinmunidad") +
+  coord_cartesian(ylim = c(1, 20)) +
+  scale_color_manual(values = c(rgb(0.05, 0.36, 0.39), rgb(0.96, 0, 0.46))) +
+  labs(title = "Evolución del AFCR a través de los meses según grupo") +
+  theme(plot.title = element_text(size = 10),
+        axis.title = element_text(size = 13),
+        strip.text = element_text(size = 15))
+
+
+# GRAFICO DE PERFILES PROMEDIO
+graf_2 <- ggplot(esclerosis, aes(x = mes, y = afcr, color = grupo)) +
+  stat_summary(fun = mean, geom = 'line', size = 1) + 
+  stat_summary(fun = mean, geom = 'point', size = 2) +
+  scale_color_manual(values = c(rgb(0.05, 0.36, 0.39), rgb(0.96, 0, 0.46))) +
+  coord_cartesian(ylim = c(1, 20)) +
+  scale_x_continuous("Mes", breaks = seq(0, 18, 3)) +
+  #scale_y_continuous("Medidad de autoinmunidad") +
+  labs(title = "Evolución del AFCR a través de los meses según grupo",
+       color = "Grupo", y = " ") +
+  theme(plot.title = element_text(size = 10),
+        axis.title = element_text(size = 13),
+        strip.text = element_text(size = 15))
+
+
+gridExtra::grid.arrange(graf_1, graf_2, ncol = 2, nrow = 1)
+```
+
+Se observa mucha variabilidad ENTRE individuos y paraceria haber variancias similares entre ambos grupos. Además las tendencias cambian después del mes 3 (grupo 1 subem grupo 2 baja); si bien los valores de AFCR medio para el grupo 1 (solo azatioprina) son mayores que para grupo 2, ambos grupos tienen una tendencia lineal decreciente.
+El cambio parecería ser igual en mabos grupos, exceptuando el mes 15 que el AFCR decrece más para el grupo de pacientes que recibió azatioprina y metilprednisona.
+
+
+```{r}
+# Boxplots
+ggplot(esclerosis, aes(x = factor(mes), y = afcr, color = grupo)) +
+  geom_boxplot() +
+  scale_x_discrete("Mes") +
+  scale_y_continuous("Medida de autoinmunidad", limits = c(1, 20), breaks = seq(1, 20, 2)) +
+  scale_color_manual(values = c(rgb(0.05, 0.36, 0.39), rgb(0.96, 0, 0.46))) +
+  labs(title = "Distribución del AFCR según grupo ",
+       color = "Grupo") +
+  theme(plot.title = element_text(size = 12),
+        axis.title = element_text(size = 12),
+        legend.position = 'bottom')
+```
+La variancia parece ser menor a medida que los meses pasan.
+
+
+```{r}
+# Estandarizo: 
+esclerosis <- esclerosis %>% 
+  mutate(afcr_est = scale(afcr))
+
+esclerosis_a <- esclerosis %>% 
+  select(-afcr) %>% 
+  spread(key = "mes", value = "afcr_est")
+names(esclerosis_a) <- c("id", "grupo", "previo", "edad", "Mes_0", "Mes_3",
+                         "Mes_6", "Mes_9", "Mes_12", "Mes_15", "Mes_18")
+
+# Subconjuntos
+esc_1 = filter(esclerosis_a, grupo == 1)
+esc_2 = filter(esclerosis_a, grupo == 2)
+
+# Correlograma
+
+# Grupo 1
+ac1.lag3 <- cor(c(esc_1$Mes_0, esc_1$Mes_3, esc_1$Mes_6, 
+                  esc_1$Mes_9, esc_1$Mes_12, esc_1$Mes_15),
+                c(esc_1$Mes_3, esc_1$Mes_6, esc_1$Mes_9, 
+                  esc_1$Mes_12, esc_1$Mes_15, esc_1$Mes_18),
+                use = "na.or.complete")
+
+ac1.lag6 <- cor(c(esc_1$Mes_0, esc_1$Mes_3, esc_1$Mes_6, 
+                  esc_1$Mes_9, esc_1$Mes_12),
+                c(esc_1$Mes_6, esc_1$Mes_9, esc_1$Mes_12, 
+                  esc_1$Mes_15, esc_1$Mes_18),
+                use = "na.or.complete")
+
+ac1.lag9 <- cor(c(esc_1$Mes_0, esc_1$Mes_3, esc_1$Mes_6,esc_1$Mes_9),
+                c(esc_1$Mes_9, esc_1$Mes_12, esc_1$Mes_15,esc_1$Mes_18),
+                use = "na.or.complete")
+
+ac1.lag12 <- cor(c(esc_1$Mes_0, esc_1$Mes_3, esc_1$Mes_6),
+                c(esc_1$Mes_12, esc_1$Mes_15, esc_1$Mes_18),
+                use = "na.or.complete")
+
+ac1.lag15 <- cor(c(esc_1$Mes_0, esc_1$Mes_3),
+                c(esc_1$Mes_15, esc_1$Mes_18),
+                use = "na.or.complete")
+
+ac1.lag18 <- cor(c(esc_1$Mes_0),
+                c(esc_1$Mes_18),
+                use = "na.or.complete")
+
+ac_grupo1 <- data.frame(rezago = seq(0,18, 3), 
+                        ac = c(1, ac1.lag3, ac1.lag6, ac1.lag9, ac1.lag12, 
+                               ac1.lag15, ac1.lag18), 
+                        grupo = "1")
+
+
+# Grupo 2
+ac2.lag3 <- cor(c(esc_2$Mes_0, esc_2$Mes_3, esc_2$Mes_6, 
+                  esc_2$Mes_9, esc_2$Mes_12, esc_2$Mes_15),
+                c(esc_2$Mes_3, esc_2$Mes_6, esc_2$Mes_9, 
+                  esc_2$Mes_12, esc_2$Mes_15, esc_2$Mes_18),
+                use = "na.or.complete")
+
+ac2.lag6 <- cor(c(esc_2$Mes_0, esc_2$Mes_3, esc_2$Mes_6, 
+                  esc_2$Mes_9, esc_2$Mes_12),
+                c(esc_2$Mes_6, esc_2$Mes_9, esc_2$Mes_12, 
+                  esc_2$Mes_15, esc_2$Mes_18),
+                use = "na.or.complete")
+
+ac2.lag9 <- cor(c(esc_2$Mes_0, esc_2$Mes_3, esc_2$Mes_6,esc_2$Mes_9),
+                c(esc_2$Mes_9, esc_2$Mes_12, esc_2$Mes_15,esc_2$Mes_18),
+                use = "na.or.complete")
+
+ac2.lag12 <- cor(c(esc_2$Mes_0, esc_2$Mes_3, esc_2$Mes_6),
+                c(esc_2$Mes_12, esc_2$Mes_15, esc_2$Mes_18),
+                use = "na.or.complete")
+
+ac2.lag15 <- cor(c(esc_2$Mes_0, esc_2$Mes_3),
+                c(esc_2$Mes_15, esc_2$Mes_18),
+                use = "na.or.complete")
+
+ac2.lag18 <- cor(c(esc_2$Mes_0),
+                c(esc_2$Mes_18),
+                use = "na.or.complete")
+
+ac_grupo2 <- data.frame(rezago = seq(0,18, 3), 
+                        ac = c(1, ac2.lag3, ac2.lag6, ac2.lag9, ac2.lag12, 
+                               ac2.lag15, ac2.lag18), 
+                        grupo = "2")
+
+correlog <- rbind(ac_grupo1, ac_grupo2)
+
+# Gráfico
+ggplot(correlog, aes(x = rezago, y = ac, group = grupo, color = grupo)) +
+  geom_point(size = 2) +
+  geom_line(size = 1) +
+  scale_x_continuous("Rezago", breaks = seq(0, 18, 3)) +
+  scale_y_continuous("Autocorrelación", limits = c(-0.25, 1), breaks = seq(-.25, 1, 0.25)) +
+  labs(title = "Correlograma", color = 'Grupo' )  +
+  scale_color_manual(values = c(rgb(0.05, 0.36, 0.39), rgb(0.96, 0, 0.46))) +
+  theme(plot.title = element_text(size = 15))
+
+
+
+
+# Variograma
+# Primero: se ajusta un modelo maximal para la media
+esclerosis <- esclerosis %>% 
+  mutate(mes2 = mes^2, mes3 = mes^3)
+
+m_media <- lm(afcr ~ previo + edad + mes + previo:mes + edad:mes + mes2+
+                previo:mes2 + edad:mes2 + mes3 + previo:mes3 + edad:mes3,
+              data = esclerosis)
+
+# Segundo: se calcula el variograma 
+esclerosis <- mutate(esclerosis, residuos = m_media$residuals)
+
+vgm <- variogram(esclerosis$id, esclerosis$mes, esclerosis$residuos)
+vgm1 = data.frame(vgm$svar)
+
+ggplot(data = vgm1, aes(x = vt, y = vv)) +
+  geom_point(color = 'grey50', na.rm = TRUE) +
+  stat_summary(fun = mean, geom = 'line', color = 'orangered', size = 1, na.rm = TRUE) + 
+  geom_hline(yintercept = vgm$sigma2) +
+  scale_x_continuous("Rezago", breaks = seq(0, 18, 3)) +
+  scale_y_continuous("Variograma muestral") +
+  labs(title = "Variograma muestral") +
+  theme(plot.title = element_text(size = 15))
+```
+
