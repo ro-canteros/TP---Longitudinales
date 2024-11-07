@@ -15,6 +15,7 @@ library(readxl)
 library(tidyverse)
 library(nlme)
 library(joineR)
+library(qqplotr)
 
 # Carga de datos
 esclerosis <- read_xlsx("esclerosisMultiple.xlsx")
@@ -211,13 +212,9 @@ ggplot(correlog, aes(x = rezago, y = ac, group = grupo, color = grupo)) +
   theme(plot.title = element_text(size = 15))
 ```
 
-El modelo escrito de manera explicita quedaría de las siguiente manera (no creo que debamos considerar el tiempo cuadratico)
+El modelo escrito en diferencia quedaría de las siguiente manera (no creo que debamos considerar el tiempo cuadratico):
 
-1) Para el grupo 1 (solo azatioprina):
-$$Y_{ij} = \beta_0 + \beta_{01} \cdot P_i + \beta_{02} \cdot E_i + (\beta_{11} + \beta_{12} \cdot P_i + \beta_{13} \cdot E_i) \cdot t_{ij} + e_{ij}$$
-
-2) Para el grupo 2 (azatioprina y metilprednisona):
-$$Y_{ij} = \beta_0 + \beta_{01} \cdot P_i + \beta_{02} \cdot E_i + (\beta_{21} + \beta_{22} \cdot P_i + \beta_{23} \cdot E_i) \cdot t_{ij} + e_{ij}$$
+$$Y_{ij} = \beta_0 + \beta_{01} \cdot P_i + \beta_{02} \cdot E_i + (\beta_{1} + \beta_{11} \cdot P_i + \beta_{12} \cdot E_i + \beta_{13} \cdot G_i) \cdot t_{ij} + e_{ij}$$
 
 Para ver qué estructura de covariancia es más adecuada para nuestros datos, lo primero que vamos a hacer es ajustar un modelo maximal para la media que no considere las correlaciones entre las mediciones repetidas.
 
@@ -225,51 +222,130 @@ Para ver qué estructura de covariancia es más adecuada para nuestros datos, lo
 esclerosis$previo <- factor(esclerosis$previo, levels = c("No", "Si"))
 esclerosis$edad <- factor(esclerosis$edad, levels = c("50 años o menos", "Más de 50 años"))
 
-m_media <- lm(afcr ~ 1 + previo + edad + mes + previo:mes + edad:mes,
+m_media <- gls(afcr ~ 1 + previo + edad + mes +grupo:mes + previo:mes + edad:mes,
               data = esclerosis)
 summary(m_media)
-```
+
+resid.1 = data.frame(esclerosis, pred = fitted(m_media), resid = resid(m_media, type = "p"))
+
+# Evaluación de la HOMOCEDASTICIDAD
+# "Residuos estandarizados vs valores predichos"
+
+graf_3 <- ggplot(data = resid.1) +
+  geom_point(aes(x = pred, y = resid), color = 'darkcyan') +
+  geom_hline(yintercept = 0) +
+  geom_hline(yintercept = c(-3, 3), linetype = 2) +
+  scale_x_continuous("Valores predichos") +
+  scale_y_continuous("Residuos estandarizados", breaks = seq(-3, 3, 1)) +
+  labs(title = "Residuos estandarizados vs valores predichos") +
+  theme(plot.title = element_text(size = 15))
 
 
 
+# Evaluación de la ESTRUCTURA DE COVARIANCIA
+# Variograma de los residuos de Cholesky
 
+# Como no se considera correlación en los datos
+# Residuos Cholesky = residuos estandarizados
 
+resid.1 = data.frame(resid.1, residChol = resid(m_media, type = 'n'))
 
-
-
-
-```{r}
-# Variograma
-
-# Segundo: se calcula el variograma 
-esclerosis <- mutate(esclerosis, residuos = m_media$residuals)
-
-vgm <- variogram(esclerosis$id, esclerosis$mes, esclerosis$residuos)
+vgm = variogram(resid.1$id, resid.1$mes, resid.1$residChol)
 vgm1 = data.frame(vgm$svar)
 
 graf_4 <- ggplot(data = vgm1, aes(x = vt, y = vv)) +
+  geom_point(color = 'grey50') +
+  geom_smooth(method = loess, se = FALSE) +
+  geom_hline(yintercept = 1) +
+  theme_light() +
+  scale_x_continuous("Rezago", breaks = seq(0, 18, 3)) +
+  scale_y_continuous("Variograma muestral", breaks = seq(0, 10, 1)) +
+  coord_cartesian(ylim = c(0, 3)) + 
+  labs(title = "Variograma muestral") +
+  theme(plot.title = element_text(size = 15))  
+
+gridExtra::grid.arrange(graf_3, graf_4, nrow=2)
+```
+
+En el gráfico de residuos vemos una variación constante asi que podríamos asumir que el supuesto de homocedasticidad se cumple (se observa un outlier por fuera del -3); además vemos que hay mucho error de medición, muy poca correlación serial y poca variabilidad entre individuos.
+Debemos agregar un efecto aleatorio, en particular una ordenada aleatoria ya que no podemos poner pendiente porque suponemos que las variancias son constantes.Por lo que el modelo quedaría así:
+
+$$Y_{ij} = \beta_0 + \beta_{01} \cdot P_i + \beta_{02} \cdot E_i + b_{0i} + (\beta_{1} + \beta_{11} \cdot P_i + \beta_{12} \cdot E_i + \beta_{13} \cdot G_i) \cdot t_{ij} + e_{ij}$$
+
+```{r}
+m1 <- lme(afcr ~ 1 + previo + edad + mes + previo:mes + edad:mes + grupo:mes,
+          random = ~ 1|id, data = esclerosis)
+
+summary(m1)
+
+resid.2 = data.frame(esclerosis, residChol = resid(m1, type = 'n', level = 0))
+vgm <- variogram(resid.2$id, resid.2$mes, resid.2$residChol)
+vgm2 = data.frame(vgm$svar)
+
+ggplot(data = vgm2, aes(x = vt, y = vv)) +
   geom_point(color = 'grey50', na.rm = TRUE) +
-  stat_summary(fun = mean, geom = 'line', color = 'orangered', size = 1, na.rm = TRUE) + 
-  geom_hline(yintercept = vgm$sigma2) +
+  geom_smooth(method = 'loess', se = FALSE, span = 1) +
+  geom_hline(yintercept = 1) +
+  theme_light() +
   scale_x_continuous("Rezago", breaks = seq(0, 18, 3)) +
   scale_y_continuous("Variograma muestral") +
+  coord_cartesian(ylim = c(0, 1.5)) + 
   labs(title = "Variograma muestral") +
-  theme(plot.title = element_text(size = 15))
-
-gridExtra::grid.arrange(graf_3, graf_4, ncol = 1, nrow = 2)
-
+  theme(plot.title = element_text(size = 15)) 
 ```
-Se puede ver que hay mucho error de medición (dado que el inicio de $\hat{\gamma}(u)$ está demasiado alejado del origen), poca variabilidad entre individuos y, viendo tanto el variograma como el correlograma, podemos decir que hay muy poca correlación serial.
+
+Está bastante muy cerca del 1; aún asi podríamos probar las estructuras de correlación serial (pese a que sabemos que no hay mucha) y compara los AIC.
+
+```{r}
+# Exponencial
+m2 <- lme(afcr ~ 1 + previo + edad + mes + previo:mes + edad:mes + grupo:mes,
+          random = ~ 1|id, correlation = corCAR1(form = ~ mes|id),
+          data = esclerosis)
+
+summary(m2)
+
+resid.3 = data.frame(esclerosis, residChol = resid(m2, type = 'n', level = 0))
+vgm <- variogram(resid.3$id, resid.3$mes, resid.3$residChol)
+vgm3 = data.frame(vgm$svar)
+
+ggplot(data = vgm3, aes(x = vt, y = vv)) +
+  geom_point(color = 'grey50', na.rm = TRUE) +
+  geom_smooth(method = 'loess', se = FALSE, span = 1) +
+  geom_hline(yintercept = 1) +
+  scale_x_continuous("Rezago", breaks = seq(0, 18, 3)) +
+  scale_y_continuous("Variograma muestral") +
+  coord_cartesian(ylim = c(0, 1.5)) + 
+  labs(title = "Variograma muestral") +
+  theme(plot.title = element_text(size = 15)) 
 
 
-PROPUESTA DE MODELOS: 
-1_ ordenada aleatoria y $R_i = \sigma^2_k \cdot I$ ya que refleja la predominancia del error de medición (k = 1,2 según el grupo), además podemos poner variancias heterogeneas en el tiempo (ya que no tenemos pendiente aleat.)
+# Gaussiana
+m3 <- lme(afcr ~ 1 + previo + edad + mes + previo:mes + edad:mes + grupo:mes,
+          random = ~ 1|id, correlation = corGaus(form = ~ 1|id),
+          data = esclerosis)
 
-2_ ordenada aleatoria y $R_i = \sigma^2 \cdot I$ (variancia común entre grupos), poner variancias heterogeneas en el tiempo
+summary(m3)
 
-3_ ordenada y pendiente aleatorias y $R_i = \sigma^2_k \cdot I$ con k = 1, 2
+resid.4 = data.frame(esclerosis, residChol = resid(m3, type = 'n', level = 0))
+vgm <- variogram(resid.4$id, resid.4$mes, resid.4$residChol)
+vgm4 = data.frame(vgm$svar)
 
-4_ ordenada y pendiente aleatorias y $R_i = \sigma^2 \cdot I$
+ggplot(data = vgm4, aes(x = vt, y = vv)) +
+  geom_point(color = 'grey50', na.rm = TRUE) +
+  geom_smooth(method = 'loess', se = FALSE, span = 1) +
+  geom_hline(yintercept = 1) +
+  theme_light() +
+  scale_x_continuous("Rezago", breaks = seq(0, 18, 3)) +
+  scale_y_continuous("Variograma muestral") +
+  coord_cartesian(ylim = c(0, 1.5)) + 
+  labs(title = "Variograma muestral") +
+  theme(plot.title = element_text(size = 15)) 
 
-Despues comparariamos todos según su valor de AIC o a través del test de razón de verosimilitud (todos están anidados)
+# Esta creo que se va mucho respecto a la otras.
+
+
+# Comparación:
+anova(m1, m2, m3) # nos quedamos con el que tendria estructura de simetria compuesta (m1)
+```
+
 
