@@ -225,7 +225,7 @@ Para ver qué estructura de covariancia es más adecuada para nuestros datos, lo
 esclerosis$previo <- factor(esclerosis$previo, levels = c("No", "Si"))
 esclerosis$edad <- factor(esclerosis$edad, levels = c("50 años o menos", "Más de 50 años"))
 
-m_media <- gls(afcr ~ 1 + previo + edad + mes +grupo:mes + previo:mes + edad:mes,
+m_media <- gls(afcr ~ 1 + previo + edad + mes + grupo:mes + previo:mes + edad:mes,
               data = esclerosis)
 summary(m_media)
 
