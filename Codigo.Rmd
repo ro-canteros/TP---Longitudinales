@@ -217,7 +217,7 @@ ggplot(correlog, aes(x = rezago, y = ac, group = grupo, color = grupo)) +
 
 El modelo escrito en diferencia quedaría de las siguiente manera (no creo que debamos considerar el tiempo cuadratico):
 
-$$Y_{ij} = \beta_0 + \beta_{01} \cdot P_i + \beta_{02} \cdot E_i + (\beta_{1} + \beta_{11} \cdot P_i + \beta_{12} \cdot E_i + \beta_{13} \cdot G_i) \cdot t_{ij} + e_{ij}$$
+$$Y_{ij} = \beta_0 + \beta_{01} \cdot P_i + \beta_{02} \cdot E_i + (\beta_{1} + \beta_{11} \cdot P_i + \beta_{12} \cdot E_i + \beta_{13} \cdot G_i + \beta_{14} \cdot P_i \cdot E_i + \beta_{15} \cdot P_i \cdot G_i + \beta_{16} \cdot E_i \cdot G_i) \cdot t_{ij} + e_{ij}$$
 
 Para ver qué estructura de covariancia es más adecuada para nuestros datos, lo primero que vamos a hacer es ajustar un modelo maximal para la media que no considere las correlaciones entre las mediciones repetidas.
 
@@ -225,7 +225,8 @@ Para ver qué estructura de covariancia es más adecuada para nuestros datos, lo
 esclerosis$previo <- factor(esclerosis$previo, levels = c("No", "Si"))
 esclerosis$edad <- factor(esclerosis$edad, levels = c("50 años o menos", "Más de 50 años"))
 
-m_media <- gls(afcr ~ 1 + previo + edad + mes + grupo:mes + previo:mes + edad:mes,
+m_media <- gls(afcr ~ 1 + previo + edad + mes + grupo:mes + previo:mes + edad:mes +
+                 previo:edad:mes + previo:grupo:mes + edad:grupo:mes,
               data = esclerosis)
 summary(m_media)
 
@@ -271,12 +272,13 @@ gridExtra::grid.arrange(graf_3, graf_4, nrow=2)
 ```
 
 En el gráfico de residuos vemos una variación constante asi que podríamos asumir que el supuesto de homocedasticidad se cumple (se observa un outlier por fuera del -3); además vemos que hay mucho error de medición, muy poca correlación serial y poca variabilidad entre individuos.
-Debemos agregar un efecto aleatorio, en particular una ordenada aleatoria ya que no podemos poner pendiente porque suponemos que las variancias son constantes.Por lo que el modelo quedaría así:
+Debemos agregar un efecto aleatorio, en particular una ordenada aleatoria (más adelante evaluaremos si es necesaría agregar también una pendiente aleatoria).Por lo que el modelo quedaría así:
 
-$$Y_{ij} = \beta_0 + \beta_{01} \cdot P_i + \beta_{02} \cdot E_i + b_{0i} + (\beta_{1} + \beta_{11} \cdot P_i + \beta_{12} \cdot E_i + \beta_{13} \cdot G_i) \cdot t_{ij} + e_{ij}$$
+$$Y_{ij} = \beta_0 + \beta_{01} \cdot P_i + \beta_{02} \cdot E_i + b_{0i} + (\beta_{1} + \beta_{11} \cdot P_i + \beta_{12} \cdot E_i + \beta_{13} \cdot G_i + \beta_{14} \cdot P_i \cdot E_i + \beta_{15} \cdot P_i \cdot G_i + \beta_{16} \cdot E_i \cdot G_i) \cdot t_{ij} + e_{ij}$$
 
 ```{r}
-m1 <- lme(afcr ~ 1 + previo + edad + mes + previo:mes + edad:mes + grupo:mes,
+m1 <- lme(afcr ~ 1 + previo + edad + mes + previo:mes + edad:mes + grupo:mes +
+            previo:edad:mes + previo:grupo:mes + edad:grupo:mes,
           random = ~ 1|id, data = esclerosis)
 
 summary(m1)
@@ -301,7 +303,8 @@ Está bastante muy cerca del 1; aún asi podríamos probar las estructuras de co
 
 ```{r}
 # Exponencial
-m2 <- lme(afcr ~ 1 + previo + edad + mes + previo:mes + edad:mes + grupo:mes,
+m2 <- lme(afcr ~ 1 + previo + edad + mes + previo:mes + edad:mes + grupo:mes +
+            previo:edad:mes + previo:grupo:mes + edad:grupo:mes,
           random = ~ 1|id, correlation = corCAR1(form = ~ mes|id),
           data = esclerosis)
 
@@ -323,7 +326,8 @@ ggplot(data = vgm3, aes(x = vt, y = vv)) +
 
 
 # Gaussiana
-m3 <- lme(afcr ~ 1 + previo + edad + mes + previo:mes + edad:mes + grupo:mes,
+m3 <- lme(afcr ~ 1 + previo + edad + mes + previo:mes + edad:mes + grupo:mes +
+            previo:edad:mes + previo:grupo:mes + edad:grupo:mes,
           random = ~ 1|id, correlation = corGaus(form = ~ 1|id),
           data = esclerosis)
 
@@ -351,4 +355,91 @@ ggplot(data = vgm4, aes(x = vt, y = vv)) +
 anova(m1, m2, m3) # nos quedamos con el que tendria estructura de simetria compuesta (m1)
 ```
 
+Decidimos que nos quedamos con el modelo con ordenada aleatoria y cuya estructura de covariancia es la Simetría Compuesta; ahora, a ese modelo, se le agrega una pendiente aleatoria y se comparan ambos modelos.
+
+```{r}
+m4 <- lme(afcr ~ 1 + previo + edad + mes + previo:mes + edad:mes + grupo:mes +
+            previo:edad:mes + previo:grupo:mes + edad:grupo:mes,
+          random = ~ mes|id, data = esclerosis)
+summary(m4)
+
+resid.5 = data.frame(esclerosis, residChol = resid(m4, type = 'n', level = 0))
+vgm <- variogram(resid.5$id, resid.5$mes, resid.5$residChol)
+vgm5 = data.frame(vgm$svar)
+
+ggplot(data = vgm5, aes(x = vt, y = vv)) +
+  geom_point(color = 'grey50', na.rm = TRUE) +
+  geom_smooth(method = 'loess', se = FALSE, span = 1) +
+  geom_hline(yintercept = 1) +
+  theme_light() +
+  scale_x_continuous("Rezago", breaks = seq(0, 18, 3)) +
+  scale_y_continuous("Variograma muestral") +
+  coord_cartesian(ylim = c(0, 1.5)) + 
+  labs(title = "Variograma muestral") +
+  theme(plot.title = element_text(size = 15)) 
+
+# Comparación
+anova(m1, m4)
+```
+
+El modelos sin pendiente aleatoria resulta ser el de menor AIC, por lo que podemos asumir que las variancias son constantes a través del tiempo. ¿Lo serán entre grupos? Se plantea un modelo con variancias distintas entre grupos y se lo compara con el modelo de variancias comunes.
+
+```{r}
+m5 <- lme(afcr ~ 1 + previo + edad + mes + previo:mes + edad:mes + grupo:mes +
+            previo:edad:mes + previo:grupo:mes + edad:grupo:mes,
+          random = ~ 1|id, weights = varIdent(form = ~ 1|grupo),
+          data = esclerosis)
+summary(m5)
+
+anova(m1, m5) # Modelo final: solo ordenada aleat y variancias iguales entre grupos.
+```
+
+
+# Análisis de residuos.
+
+Se extraen los residuos condicionales y marginales estandarizados, los marginales de CHolesky y los valores predichos condicionales y marginales para evaluar que el modela realmente sea adecuado.
+
+```{r}
+residuos <- data.frame(esclerosis,
+                       res_cond_est = resid(m1, type = "p", level = 1),
+                       res_marg_est = resid(m1, type = "p", level = 0),
+                       res_marg_ch = resid(m1, type = "n", level = 0),
+                       pred_cond = fitted(m1, level = 1),
+                       pred_marg = fitted(m1, level = 0))
+```
+
+
+## Linealidad
+
+Se prueba haciendo un gráfico de "residuos marginales estandarizados vs. Tiempo".
+
+```{r}
+ggplot(data = residuos, aes(x = mes, y = res_marg_est)) +
+  geom_point(color = 'darkcyan') +
+  geom_hline(yintercept = 0) +
+  scale_x_continuous("Valores predichos") +
+  scale_y_continuous("Residuos marginales estandarizados", breaks = seq(-10, 10, 1)) +
+  labs(title = "Residuos marginales estandarizados vs tiempo") +
+  theme(plot.title = element_text(size = 15))
+```
+
+No ningún patrón visible, entonces podemos decir que el modelo para la media esta bien planteado.
+
+
+- Nota: entre estos dos gráficos va el Variograma con los residuos de Cholesky para ver la estrcutura de covariancia (ya está hecho, y mostrado, al principio)
+
+## Homocedasticidad
+
+Se prueba con el gráfico "Res. condicionales estandarizados vs. Predichos"
+
+```{r}
+ggplot(data = residuos) +
+  geom_point(aes(x = pred_cond, y = res_cond_est), color = 'darkcyan') +
+  geom_hline(yintercept = 0) +
+  geom_hline(yintercept = c(-3, 3), linetype = 2) +
+  scale_x_continuous("Valores predichos") +
+  scale_y_continuous("Residuos condicionales estandarizados", breaks = seq(-6, 6, 1)) +
+  labs(title = "Residuos Condicionales estandarizados vs valores predichos") +
+  theme(plot.title = element_text(size = 15)) 
+```
 
