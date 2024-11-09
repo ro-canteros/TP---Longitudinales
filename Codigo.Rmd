@@ -5,8 +5,8 @@ date: "2024-11-05"
 output: html_document
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+```{r setup}
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
 ```
 
 ```{r}
@@ -19,6 +19,7 @@ library(qqplotr)
 
 # Carga de datos
 esclerosis <- read_xlsx("esclerosisMultiple.xlsx")
+head(esclerosis)
 
 # Modificaciones
 esclerosis <- esclerosis %>% 
@@ -75,16 +76,17 @@ gridExtra::grid.arrange(graf_1, graf_2, ncol = 2, nrow = 1)
 ```
 
 Se observa mucha variabilidad INTRA individuos (se observan mucho picos), habría bastante variabilidad ENTRE individuos también y paraceria haber variancias similares entre ambos grupos. Además las tendencias cambian después del mes 3 (grupo 1 suben, grupo 2 baja); si bien los valores de AFCR medio para el grupo 1 (solo azatioprina) son mayores que para grupo 2, ambos grupos tienen una tendencia lineal decreciente.
+
 El cambio parecería ser igual en ambos grupos, exceptuando el mes 15 que el AFCR decrece más para el grupo de pacientes que recibió azatioprina y metilprednisona.
 
 
 ```{r}
 # Boxplots
-ggplot(esclerosis, aes(x = factor(mes), y = afcr, color = grupo)) +
+ggplot(esclerosis, aes(x = factor(mes), y = afcr, fill = grupo)) +
   geom_boxplot() +
   scale_x_discrete("Mes") +
   scale_y_continuous("Medida de autoinmunidad", limits = c(1, 20), breaks = seq(1, 20, 2)) +
-  scale_color_manual(values = c(rgb(0.05, 0.36, 0.39), rgb(0.96, 0, 0.46))) +
+  scale_fill_manual(values = c(rgb(0.05, 0.36, 0.39), rgb(0.96, 0, 0.46))) +
   labs(title = "Distribución del AFCR según grupo ",
        color = "Grupo") +
   theme(plot.title = element_text(size = 12),
@@ -97,6 +99,7 @@ desvios <-esclerosis %>%
   group_by(mes, grupo) %>% 
   summarise(desvio = round(sd(afcr), 2)) %>% 
   arrange(grupo)
+
 desvios <- desvios %>%
   spread(key = "mes", value = "desvio")
 names(desvios)=c("grupo", "DE.0", "DE.3", "DE.6", "DE.9", "DE.12", "DE.15", "DE.18")
