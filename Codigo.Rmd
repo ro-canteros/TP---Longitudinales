@@ -443,3 +443,169 @@ ggplot(data = residuos) +
   theme(plot.title = element_text(size = 15)) 
 ```
 
+Los puntos se observan distribuidos de manera aproximadamente aleatoria alrededor de cero y dentro de un rango constante (no patrón), si bien se observa un punto casi al limite (posible outlier) aun así podemos decir que el modelo para la variancia esta bien espeficado.
+
+
+## Normalidad error condicional
+
+Se prueba con un gráfico probabilistico normlar de los residuos condicionales estandarizados.
+
+```{r}
+ggplot(data = residuos, aes(sample = res_cond_est)) +
+  stat_qq_band(bandType = 'boot', fill = 'grey80') +
+  stat_qq_line() + 
+  stat_qq_point(color = 'darkcyan') +
+  labs(x = 'Cuantiles teóricos', y = 'Residuos condicionales estandarizados',
+       title = 'Gráfico probabilistico normal de los residuos condicionales') 
+```
+Hay normalidad pese a los puntos que se observan arriba.
+
+## Normalidad de los efectos aleatorios
+
+Se prueba con un gráfico probilistico Chi-cuadrado de la distancia de Mahalanobis.
+
+```{r}
+# Extraigo la matriz D -variancia de los b_i-
+D <-  getVarCov(m1, type = "random.effects")
+M_i <- mahalanobis(ranef(m1), 0, D)
+M_i <- data.frame(id = esclerosis_a$id, M_i)
+
+# Defino la distribución y los g.l
+dist <- "chisq"
+gl <- list(df = 1)
+
+ggplot(data = M_i, aes(sample = M_i)) +
+  stat_qq_band(distribution = dist, dparams = gl, fill = 'grey80') +
+  stat_qq_line(distribution = dist, dparams = gl) + 
+  stat_qq_point(distribution = dist, dparams = gl, color = 'darkcyan') +
+  labs(x = 'Cuantiles teóricos', y = 'Distancia de Mahalanobis',
+       title = 'Gráfico probabilistico chi-cuadrado de la distancia de Mahalanobis')
+
+```
+Se encuentran dentro de las bandas de confianza; el valor que se observa más alejado podria ser, again, una observacion atipica.
+
+## Outliers
+
+Se pueden detectar 2 tipos de outliers: observaciones y perfiles.
+
+### 1) Observaciones
+
+El gráfico que mejor los detecta es el de "Res. condicionales estudentizados vs. N° de observaciones".
+
+```{r}
+residuos <-  mutate(residuos, obs = 1:847)
+ggplot(data = residuos) +
+  geom_point(aes(x = obs, y = res_cond_est), color = 'darkcyan') +
+  geom_hline(yintercept = 0) +
+  scale_x_continuous("Observación") +
+  scale_y_continuous("Residuos condicinales estandarizados", breaks = seq(-6, 6, 1)) +
+  coord_cartesian(ylim = c(-3, 3)) +
+  labs(title = "Residuos condicionales estandarizados vs tiempo") +
+  theme(plot.title = element_text(size = 15))
+
+```
+Se observa un solo punto al borde del limite del intervalo considerado para los residuos (casi -3).
+
+### 2) Perfiles/Individuos
+
+Se detectan a través de un gráfico que plantea "Dist. de Mahalanobis vs. id".
+
+```{r}
+ggplot(data = M_i) +
+  geom_point(aes(x = id, y = M_i), color = 'darkcyan') +
+  geom_hline(yintercept = 0) +
+  theme_light() +
+#  scale_x_continuous("Individuo") +
+  scale_y_continuous("Distancia de Mahalanobis") + #, breaks = seq(-6, 6, 1)) +
+  labs(title = "Distancia de Mahalanobis vs id") +
+  theme(plot.title = element_text(size = 15))
+```
+Vemos que hay 3 individuos cuyos perfiles se alejan de los demás.
+Veamos, cuáles son.
+
+```{r}
+ggplot() + 
+  geom_line(data = esclerosis, mapping = aes(x = mes, y = afcr, group = id), 
+            size = 0.5, na.rm = T, color = 'grey50') +
+  geom_point(size = 0.5, na.rm = T, color = 'grey50') +
+  geom_line(data = filter(esclerosis,id == 127), mapping = aes(x = mes, y = afcr), 
+            size = 0.5, na.rm = T, color = 'orangered') +
+  geom_line(data = filter(esclerosis,id == 109), mapping = aes(x = mes,y = afcr), 
+            size = 0.5, na.rm = T, color = 'green') +
+  geom_line(data = filter(esclerosis,id == 55), mapping = aes(x = mes, y = afcr), 
+            size = 0.5, na.rm = T, color = 'blue') +
+  facet_wrap(~ grupo) +
+  scale_x_continuous("Mes", breaks = seq(0, 18, 3)) +
+  scale_y_continuous("Medidad de autoinmunidad") +
+  labs(title = "Evolución del AFCR a través de los meses según grupo de pacientes") +
+  theme(plot.title = element_text(size = 17))
+```
+
+Si bien las distancias de Mahalanobis de estos 3 individuos se alejan de las demás, sus perfiles parecerían estar bastante esntre mezclados con los otros.
+
+
+# Test de hipótesis
+
+$$
+Y_{ij} = \beta_0 + \beta_{01} \cdot P_i + \beta_{02} \cdot E_i + (\beta_{1} + \beta_{11} \cdot P_i + \beta_{12} \cdot E_i + \beta_{13} \cdot G_i + \beta_{14} \cdot P_i \cdot E_i + \beta_{15} \cdot P_i \cdot G_i + \beta_{16} \cdot E_i \cdot G_i) \cdot t_{ij} + e_{ij}
+$$
+
+¿El nivel medio de AFCR antes de comenzar el tratamiento está asociado con la edad del paciente o el hecho de haber recibido tratamiento previo con esas drogas?
+
+Esto se traduce en que $H_0) \beta_{01} = 0$ por un lado; y $H_0) \beta_{02} = 0$ por otro
+
+```{r}
+# Re-ajusto el modelo con Maxima Verosimilitud
+m1 <- update(m1, method = "ML", data = esclerosis)
+
+m1_1 <- update(m1, fixed = ~ 1 + previo + mes + previo:mes + edad:mes + grupo:mes + 
+                 previo:mes + previo:edad:mes + previo:grupo:mes + edad:grupo:mes,
+               data = esclerosis)
+
+m1_2 <- update(m1, fixed = ~ 1 + edad + mes + previo:mes + edad:mes + grupo:mes + 
+                 previo:mes + previo:edad:mes + previo:grupo:mes + edad:grupo:mes,
+               data = esclerosis)
+
+anova(m1, m1_1) #Rechazo H0 ---> el nivel de AFCR antes de inciar se ve afectado por la edad
+anova(m1, m1_2) # Rechazo H0 ---> Idem. anterior pero para trat. previo
+```
+
+¿La tasa de cambio típica del nivel AFCR difiere entre ambos tratamientos?
+
+
+¿La tasa de cambio del nivel medio de AFCR depende de la edad del paciente y/o el hecho de haber recibido tratamiento previo con alguna de estas drogas?
+
+Esta pregunta refiere al efecto de las variables EDAD y PREVIO en la pendiente del modelo; al ser variables binarias, se van a probar tantas hipótesis como combinaciones delas variables.
+
+$$Y_{ij} = \beta_0 + \beta_{01} \cdot P_i + \beta_{02} \cdot E_i + (\beta_{1} + \beta_{11} \cdot P_i + \beta_{12} \cdot E_i + \beta_{13} \cdot G_i + \beta_{14} \cdot P_i \cdot E_i + \beta_{15} \cdot P_i \cdot G_i + \beta_{16} \cdot E_i \cdot G_i) \cdot t_{ij} + e_{ij}$$
+
+$P_i = 0; E_i = 0 \Longrightarrow pendiente = \beta_1 + \beta_{13} \cdot G_i$
+$P_i = 1; E_i = 0 \Longrightarrow pendiente = \beta_1 + \beta_{11} + (\beta_{13} + \beta_{15}) \cdot G_i$
+$P_i = 0; E_i = 1 \Longrightarrow pendiente = \beta_1 + \beta_{12} + (\beta_{13} + \beta{16}) \cdot G_i$
+$P_i = 1; E_i = 1 \Longrightarrow pendiente = \beta_{1} + \beta_{11}+ \beta_{12}+ \beta_{14} + (\beta_{13} \beta_{15}+ \beta_{16}) \cdot G_i$
+
+
+Primero probamos si la interacción entre PREVIO y EDAD es significativa, después el resto de cosas
+
+Efecto PREVIO sobre la pediente: si quiero probar que no hay --> borro todos los betas asocs a esa variable ----> $H_0) \beta_{11} = \beta_{14} = \beta_{15} = 0$
+
+Efecto EDAD sobre la pendiente: si quiero probar que no hay --> borro todos los betas asocs a esa variable ----> $H_0) \beta_{12} = \beta_{14} = \beta_{16} = 0$
+
+```{r}
+m1_3 <- update(m1, fixed = ~ 1 + previo + edad + mes + previo:mes + edad:mes + 
+                 grupo:mes, data = esclerosis)
+anova(m1, m1_3) # No rechazo H0 ---> la interacción P*E no es significativa
+
+m1_4 <- update(m1, fixed = ~ 1 + previo + edad + mes + edad:mes + grupo:mes,
+               data = esclerosis)
+m1_5 <- update(m1, fixed = ~ 1 + previo + edad + mes + previo:mes + grupo:mes,
+               data = esclerosis)
+anova(m1, m1_4) # No hay efecto previo en la pendiente
+anova(m1, m1_5) # No hay efecto edad en la pendiente
+
+# Por las dudas los pruebo juntos
+m1_6 <- update(m1, fixed = ~ 1 + previo + edad + mes + grupo:mes,
+               data = esclerosis)
+anova(m1, m1_6) # No rechazo H0
+```
+
