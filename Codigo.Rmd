@@ -279,8 +279,9 @@ $$Y_{ij} = \beta_0 + \beta_{01} \cdot P_i + \beta_{02} \cdot E_i + b_{0i} + (\be
 ```{r}
 m1 <- lme(afcr ~ 1 + previo + edad + mes + previo:mes + edad:mes + grupo:mes +
             previo:edad:mes + previo:grupo:mes + edad:grupo:mes,
-          random = ~ 1|id, data = esclerosis)
-
+          random = ~ 1|id,
+          method = "REML",
+          data = esclerosis)
 summary(m1)
 
 resid.2 = data.frame(esclerosis, residChol = resid(m1, type = 'n', level = 0))
@@ -305,7 +306,9 @@ Está bastante muy cerca del 1; aún asi podríamos probar las estructuras de co
 # Exponencial
 m2 <- lme(afcr ~ 1 + previo + edad + mes + previo:mes + edad:mes + grupo:mes +
             previo:edad:mes + previo:grupo:mes + edad:grupo:mes,
-          random = ~ 1|id, correlation = corCAR1(form = ~ mes|id),
+          method = "REML",
+          random = ~ 1|id, 
+          correlation = corCAR1(form = ~ mes|id),
           data = esclerosis)
 
 summary(m2)
@@ -328,7 +331,9 @@ ggplot(data = vgm3, aes(x = vt, y = vv)) +
 # Gaussiana
 m3 <- lme(afcr ~ 1 + previo + edad + mes + previo:mes + edad:mes + grupo:mes +
             previo:edad:mes + previo:grupo:mes + edad:grupo:mes,
-          random = ~ 1|id, correlation = corGaus(form = ~ 1|id),
+          random = ~ 1|id, 
+          method = "REML",
+          correlation = corGaus(form = ~ 1|id),
           data = esclerosis)
 
 summary(m3)
@@ -360,7 +365,9 @@ Decidimos que nos quedamos con el modelo con ordenada aleatoria y cuya estructur
 ```{r}
 m4 <- lme(afcr ~ 1 + previo + edad + mes + previo:mes + edad:mes + grupo:mes +
             previo:edad:mes + previo:grupo:mes + edad:grupo:mes,
-          random = ~ mes|id, data = esclerosis)
+          method = "REML",
+          random = ~ mes|id, 
+          data = esclerosis)
 summary(m4)
 
 resid.5 = data.frame(esclerosis, residChol = resid(m4, type = 'n', level = 0))
@@ -387,7 +394,8 @@ El modelos sin pendiente aleatoria resulta ser el de menor AIC, por lo que podem
 ```{r}
 m5 <- lme(afcr ~ 1 + previo + edad + mes + previo:mes + edad:mes + grupo:mes +
             previo:edad:mes + previo:grupo:mes + edad:grupo:mes,
-          random = ~ 1|id, weights = varIdent(form = ~ 1|grupo),
+          random = ~ 1|id, 
+          weights = varIdent(form = ~ 1|grupo),
           data = esclerosis)
 summary(m5)
 
