@@ -693,3 +693,5 @@ summary(m1)
 ### Objetivo 5
 
 Con estos resultados ¿qué recomendaciones de tratamiento darías para pacientes con esclerosis múltiple?
+
+Les diría a los pacientes que sin importar su edad o si ya han recibido tratamiento con alguna de las drogas consideradas en esta investigación, realicen el tratamiento con azatioprina y metilprednisona, ya que mejora la inmunidad en personas con esclerosis múltiple.
