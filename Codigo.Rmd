@@ -215,6 +215,8 @@ ggplot(correlog, aes(x = rezago, y = ac, group = grupo, color = grupo)) +
   theme(plot.title = element_text(size = 15))
 ```
 
+## Selección del modelo
+
 El modelo escrito en diferencia quedaría de las siguiente manera (no creo que debamos considerar el tiempo cuadratico):
 
 $$Y_{ij} = \beta_0 + \beta_{01} \cdot P_i + \beta_{02} \cdot E_i + (\beta_{1} + \beta_{11} \cdot P_i + \beta_{12} \cdot E_i + \beta_{13} \cdot G_i + \beta_{14} \cdot P_i \cdot E_i + \beta_{15} \cdot P_i \cdot G_i + \beta_{16} \cdot E_i \cdot G_i) \cdot t_{ij} + e_{ij}$$
@@ -277,8 +279,9 @@ Debemos agregar un efecto aleatorio, en particular una ordenada aleatoria (más 
 $$Y_{ij} = \beta_0 + \beta_{01} \cdot P_i + \beta_{02} \cdot E_i + b_{0i} + (\beta_{1} + \beta_{11} \cdot P_i + \beta_{12} \cdot E_i + \beta_{13} \cdot G_i + \beta_{14} \cdot P_i \cdot E_i + \beta_{15} \cdot P_i \cdot G_i + \beta_{16} \cdot E_i \cdot G_i) \cdot t_{ij} + e_{ij}$$
 
 ```{r}
-m1 <- lme(afcr ~ 1 + previo + edad + mes + previo:mes + edad:mes + grupo:mes +
-            previo:edad:mes + previo:grupo:mes + edad:grupo:mes,
+m1 <- lme(afcr ~ 1 + previo + edad + mes + previo:mes + edad:mes +
+            grupo:mes + previo:edad:mes + previo:grupo:mes +
+            edad:grupo:mes,
           random = ~ 1|id,
           method = "REML",
           data = esclerosis)
@@ -300,7 +303,7 @@ ggplot(data = vgm2, aes(x = vt, y = vv)) +
   theme(plot.title = element_text(size = 15)) 
 ```
 
-Está bastante muy cerca del 1; aún asi podríamos probar las estructuras de correlación serial (pese a que sabemos que no hay mucha) y compara los AIC.
+Está bastante muy cerca del 1; aún asi podríamos probar las estructuras de correlación serial (pese a que sabemos que no hay mucha) y comparar los AIC.
 
 ```{r}
 # Exponencial
@@ -402,8 +405,7 @@ summary(m5)
 anova(m1, m5) # Modelo final: solo ordenada aleat y variancias iguales entre grupos.
 ```
 
-
-# Análisis de residuos.
+## Análisis de residuos.
 
 Se extraen los residuos condicionales y marginales estandarizados, los marginales de CHolesky y los valores predichos condicionales y marginales para evaluar que el modela realmente sea adecuado.
 
@@ -417,7 +419,7 @@ residuos <- data.frame(esclerosis,
 ```
 
 
-## Linealidad
+### Linealidad
 
 Se prueba haciendo un gráfico de "residuos marginales estandarizados vs. Tiempo".
 
@@ -436,7 +438,7 @@ No ningún patrón visible, entonces podemos decir que el modelo para la media e
 
 - Nota: entre estos dos gráficos va el Variograma con los residuos de Cholesky para ver la estrcutura de covariancia (ya está hecho, y mostrado, al principio)
 
-## Homocedasticidad
+### Homocedasticidad
 
 Se prueba con el gráfico "Res. condicionales estandarizados vs. Predichos"
 
@@ -454,7 +456,7 @@ ggplot(data = residuos) +
 Los puntos se observan distribuidos de manera aproximadamente aleatoria alrededor de cero y dentro de un rango constante (no patrón), si bien se observa un punto casi al limite (posible outlier) aun así podemos decir que el modelo para la variancia esta bien espeficado.
 
 
-## Normalidad error condicional
+### Normalidad error condicional
 
 Se prueba con un gráfico probabilistico normlar de los residuos condicionales estandarizados.
 
@@ -468,7 +470,7 @@ ggplot(data = residuos, aes(sample = res_cond_est)) +
 ```
 Hay normalidad pese a los puntos que se observan arriba.
 
-## Normalidad de los efectos aleatorios
+### Normalidad de los efectos aleatorios
 
 Se prueba con un gráfico probilistico Chi-cuadrado de la distancia de Mahalanobis.
 
@@ -492,11 +494,11 @@ ggplot(data = M_i, aes(sample = M_i)) +
 ```
 Se encuentran dentro de las bandas de confianza; el valor que se observa más alejado podria ser, again, una observacion atipica.
 
-## Outliers
+### Outliers
 
 Se pueden detectar 2 tipos de outliers: observaciones y perfiles.
 
-### 1) Observaciones
+#### 1) Observaciones
 
 El gráfico que mejor los detecta es el de "Res. condicionales estudentizados vs. N° de observaciones".
 
@@ -514,7 +516,7 @@ ggplot(data = residuos) +
 ```
 Se observa un solo punto al borde del limite del intervalo considerado para los residuos (casi -3).
 
-### 2) Perfiles/Individuos
+#### 2) Perfiles/Individuos
 
 Se detectan a través de un gráfico que plantea "Dist. de Mahalanobis vs. id".
 
@@ -551,12 +553,13 @@ ggplot() +
 
 Si bien las distancias de Mahalanobis de estos 3 individuos se alejan de las demás, sus perfiles parecerían estar bastante esntre mezclados con los otros.
 
-
-# Test de hipótesis
+## Test de hipótesis
 
 $$
 Y_{ij} = \beta_0 + \beta_{01} \cdot P_i + \beta_{02} \cdot E_i + (\beta_{1} + \beta_{11} \cdot P_i + \beta_{12} \cdot E_i + \beta_{13} \cdot G_i + \beta_{14} \cdot P_i \cdot E_i + \beta_{15} \cdot P_i \cdot G_i + \beta_{16} \cdot E_i \cdot G_i) \cdot t_{ij} + e_{ij}
 $$
+
+### Hipótesis 1
 
 ¿El nivel medio de AFCR antes de comenzar el tratamiento está asociado con la edad del paciente o el hecho de haber recibido tratamiento previo con esas drogas?
 
@@ -566,20 +569,41 @@ Esto se traduce en que $H_0) \beta_{01} = 0$ por un lado; y $H_0) \beta_{02} = 0
 # Re-ajusto el modelo con Maxima Verosimilitud
 m1 <- update(m1, method = "ML", data = esclerosis)
 
-m1_1 <- update(m1, fixed = ~ 1 + previo + mes + previo:mes + edad:mes + grupo:mes + 
-                 previo:mes + previo:edad:mes + previo:grupo:mes + edad:grupo:mes,
+m1_1 <- update(m1, fixed = ~ 1 + previo + mes + previo:mes +
+                 edad:mes + grupo:mes + previo:mes +
+                 previo:edad:mes + previo:grupo:mes +
+                 edad:grupo:mes,
                data = esclerosis)
 
 m1_2 <- update(m1, fixed = ~ 1 + edad + mes + previo:mes + edad:mes + grupo:mes + 
                  previo:mes + previo:edad:mes + previo:grupo:mes + edad:grupo:mes,
                data = esclerosis)
 
-anova(m1, m1_1) #Rechazo H0 ---> el nivel de AFCR antes de inciar se ve afectado por la edad
-anova(m1, m1_2) # Rechazo H0 ---> Idem. anterior pero para trat. previo
+anova(m1, m1_1) #Rechazo H0 
+anova(m1, m1_2) # Rechazo H0 
 ```
+
+Como rechazamos ambas hipótesis, el nivel de AFCR antes de iniciar el tratamiento se ve afectado por la Edad y por el tratamiento Previo.
+
+### Hipótesis 2
 
 ¿La tasa de cambio típica del nivel AFCR difiere entre ambos tratamientos?
 
+La idea es igualar a 0 todos los parámetros en la pendiente relacionados al Grupo.
+
+La hipótesis nula a probar es $H_0)\, \beta_{13} = \beta_{15} = \beta_{16} = 0$
+
+```{r}
+m1_3 <- update(m1, fixed = ~ 1 + previo + edad + mes + previo:mes + edad:mes +
+            previo:edad:mes,
+               data = esclerosis)
+
+anova(m1, m1_3) #Rechazo H0  
+```
+
+La tasa de cambio típica difiere entre ambos Grupos (tratamientos)
+
+### Hipótesis 3
 
 ¿La tasa de cambio del nivel medio de AFCR depende de la edad del paciente y/o el hecho de haber recibido tratamiento previo con alguna de estas drogas?
 
@@ -617,3 +641,10 @@ m1_6 <- update(m1, fixed = ~ 1 + previo + edad + mes + grupo:mes,
 anova(m1, m1_6) # No rechazo H0
 ```
 
+### Objetivo 4
+
+Obtener estimaciones de la tasa de cambio promedio para cada grupo de pacientes.
+
+### Objetivo 5
+
+Con estos resultados ¿qué recomendaciones de tratamiento darías para pacientes con esclerosis múltiple?
