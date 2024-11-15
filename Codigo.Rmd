@@ -607,40 +607,6 @@ La tasa de cambio típica difiere entre ambos Grupos (tratamientos)
 
 ¿La tasa de cambio del nivel medio de AFCR depende de la edad del paciente y/o el hecho de haber recibido tratamiento previo con alguna de estas drogas?
 
-#### Forma vieja
-
-Esta pregunta refiere al efecto de las variables EDAD y PREVIO en la pendiente del modelo; al ser variables binarias, se van a probar tantas hipótesis como combinaciones delas variables.
-
-$P_i = 0; E_i = 0 \Longrightarrow pendiente = \beta_1 + \beta_{13} \cdot G_i$
-$P_i = 1; E_i = 0 \Longrightarrow pendiente = \beta_1 + \beta_{11} + (\beta_{13} + \beta_{15}) \cdot G_i$
-$P_i = 0; E_i = 1 \Longrightarrow pendiente = \beta_1 + \beta_{12} + (\beta_{13} + \beta{16}) \cdot G_i$
-$P_i = 1; E_i = 1 \Longrightarrow pendiente = \beta_{1} + \beta_{11}+ \beta_{12}+ \beta_{14} + (\beta_{13} \beta_{15}+ \beta_{16}) \cdot G_i$
-
-
-Primero probamos si la interacción entre PREVIO y EDAD es significativa, después el resto de cosas
-
-Efecto PREVIO sobre la pediente: si quiero probar que no hay --> borro todos los betas asocs a esa variable ----> $H_0) \beta_{11} = \beta_{14} = \beta_{15} = 0$
-
-Efecto EDAD sobre la pendiente: si quiero probar que no hay --> borro todos los betas asocs a esa variable ----> $H_0) \beta_{12} = \beta_{14} = \beta_{16} = 0$
-
-```{r}
-m1_3 <- update(m1, fixed = ~ 1 + previo + edad + mes + previo:mes + edad:mes + 
-                 grupo:mes, data = esclerosis)
-anova(m1, m1_3) # No rechazo H0 ---> la interacción P*E no es significativa
-
-m1_4 <- update(m1, fixed = ~ 1 + previo + edad + mes + edad:mes + grupo:mes,
-               data = esclerosis)
-m1_5 <- update(m1, fixed = ~ 1 + previo + edad + mes + previo:mes + grupo:mes,
-               data = esclerosis)
-anova(m1, m1_4) # No hay efecto previo en la pendiente
-anova(m1, m1_5) # No hay efecto edad en la pendiente
-
-# Por las dudas los pruebo juntos
-m1_6 <- update(m1, fixed = ~ 1 + previo + edad + mes + grupo:mes,
-               data = esclerosis)
-anova(m1, m1_6) # No rechazo H0
-```
-
 #### Forma Agus
 
 Creo que no hace falta probar primero el efecto interacción
