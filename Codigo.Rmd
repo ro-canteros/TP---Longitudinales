@@ -607,9 +607,9 @@ La tasa de cambio típica difiere entre ambos Grupos (tratamientos)
 
 ¿La tasa de cambio del nivel medio de AFCR depende de la edad del paciente y/o el hecho de haber recibido tratamiento previo con alguna de estas drogas?
 
-Esta pregunta refiere al efecto de las variables EDAD y PREVIO en la pendiente del modelo; al ser variables binarias, se van a probar tantas hipótesis como combinaciones delas variables.
+#### Forma vieja
 
-$$Y_{ij} = \beta_0 + \beta_{01} \cdot P_i + \beta_{02} \cdot E_i + (\beta_{1} + \beta_{11} \cdot P_i + \beta_{12} \cdot E_i + \beta_{13} \cdot G_i + \beta_{14} \cdot P_i \cdot E_i + \beta_{15} \cdot P_i \cdot G_i + \beta_{16} \cdot E_i \cdot G_i) \cdot t_{ij} + e_{ij}$$
+Esta pregunta refiere al efecto de las variables EDAD y PREVIO en la pendiente del modelo; al ser variables binarias, se van a probar tantas hipótesis como combinaciones delas variables.
 
 $P_i = 0; E_i = 0 \Longrightarrow pendiente = \beta_1 + \beta_{13} \cdot G_i$
 $P_i = 1; E_i = 0 \Longrightarrow pendiente = \beta_1 + \beta_{11} + (\beta_{13} + \beta_{15}) \cdot G_i$
@@ -641,9 +641,54 @@ m1_6 <- update(m1, fixed = ~ 1 + previo + edad + mes + grupo:mes,
 anova(m1, m1_6) # No rechazo H0
 ```
 
+#### Forma Agus
+
+Creo que no hace falta probar primero el efecto interacción
+
+Las hipótesis a probar son:
+
+ - $H_0) \beta_{12} = \beta_{14} = \beta_{16} = 0$ para la Edad.
+ 
+ - $H_0) \beta_{11} = \beta_{14} = \beta_{15} = 0$ para el tratamiento Previo.
+ 
+```{r}
+# Edad
+m1_4 <- update(m1, fixed = ~ 1 + previo + edad + mes +
+                 previo:mes + grupo:mes + previo:grupo:mes,
+               data = esclerosis)
+
+anova(m1, m1_4) # No Rechazo H0  
+
+# Previo
+
+m1_5 <- update(m1, fixed = ~ 1 + previo + edad + mes + 
+                 edad:mes + grupo:mes + edad:grupo:mes,
+               data = esclerosis)
+
+anova(m1, m1_5) # No Rechazo H0 
+
+```
+ 
+Ni la edad del paciente ni el tratamiento previo tienen efecto sobre la disminución media del nivel de AFCR.
+
 ### Objetivo 4
 
 Obtener estimaciones de la tasa de cambio promedio para cada grupo de pacientes.
+
+```{r}
+summary(m1)
+```
+
+| Grupo | Previo |    Edad    | Tasa de cambio promedio |
+|-------|--------|------------|-------------------------|
+| 1     | No     | <= 50 años | -0.1875                 |
+| 1     | No     | > 50 años  | -0.1786                 |
+| 1     | Si     | <= 50 años | -0.1459                 |
+| 1     | Si     | > 50 años  | -0.1442                 |
+| 2     | No     | <= 50 años | -0.2247                 |
+| 2     | No     | > 50 años  | -0.2158                 |
+| 2     | Si     | <= 50 años | -0.1831                 |
+| 2     | Si     | > 50 años  | -0.1800                 |
 
 ### Objetivo 5
 
