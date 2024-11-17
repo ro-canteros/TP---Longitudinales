@@ -1,6 +1,7 @@
 ---
 title: "Trabajo Práctico"
-author: "Ro Canteros"
+subtitle: "Análisis de datos longitudinales"
+author: "Canteros, Rocio - Mac Kay, Agustina"
 date: "2024-11-05"
 output: html_document
 ---
@@ -50,9 +51,9 @@ graf_1 <- ggplot(esclerosis, aes(x = mes, y = afcr, group = id, color = grupo)) 
   scale_x_continuous("Mes", breaks = seq(0, 18, 3)) +
   scale_y_continuous("Medida de autoinmunidad") +
   coord_cartesian(ylim = c(1, 20)) +
-  scale_color_manual(values = c(rgb(0.05, 0.36, 0.39), rgb(0.96, 0, 0.46))) +
+  scale_color_manual(values = c("#34c77b", "#f16f3b")) +
   labs(title = "Evolución del AFCR a través de los meses según grupo") +
-  theme(plot.title = element_text(size = 10),
+  theme(plot.title = element_text(size = 9),
         axis.title = element_text(size = 13),
         strip.text = element_text(size = 15))
 
@@ -67,7 +68,7 @@ graf_2 <- ggplot(esclerosis, aes(x = mes, y = afcr, color = grupo)) +
   scale_y_continuous("ACFR") +
   labs(title = "Evolución del nivel medio de ACFR en el tiempo",
        color = "Grupo", y = " ") +
-  theme(plot.title = element_text(size = 12),
+  theme(plot.title = element_text(size = 9),
         axis.title = element_text(size = 10),
         strip.text = element_text(size = 10),
         legend.position = c(0.85, 0.80),
@@ -127,7 +128,8 @@ names(esclerosis_a) <- c("id", "grupo", "previo", "edad", "Mes_0", "Mes_3",
 # Subconjuntos
 esc_1 = filter(esclerosis_a, grupo == 1)
 esc_2 = filter(esclerosis_a, grupo == 2)
-# Grafico de Draftman: No cre que debamos mostrarlo es solo para darnos una mejor idea de como son las correlaciones entre los tiempos de medición.
+
+# Grafico de Draftman:
 escl_1_est <- data.frame(scale(esc_1[5:11]))
 GGally::ggpairs(escl_1_est)
 
@@ -216,13 +218,13 @@ ggplot(correlog, aes(x = rezago, y = ac, group = grupo, color = grupo)) +
   scale_x_continuous("Rezago", breaks = seq(0, 18, 3)) +
   scale_y_continuous("Autocorrelación", limits = c(-0.25, 1), breaks = seq(-.25, 1, 0.25)) +
   labs(title = "Correlograma", color = 'Grupo' )  +
-  scale_color_manual(values = c(rgb(0.05, 0.36, 0.39), rgb(0.96, 0, 0.46))) +
+  scale_color_manual(values = c("#34c77b", "#f16f3b")) +
   theme(plot.title = element_text(size = 15))
 ```
 
 ## Selección del modelo
 
-El modelo escrito en diferencia quedaría de las siguiente manera (no creo que debamos considerar el tiempo cuadratico):
+El modelo escrito en diferencia quedaría de las siguiente manera:
 
 $$Y_{ij} = \beta_0 + \beta_{01} \cdot P_i + \beta_{02} \cdot E_i + (\beta_{1} + \beta_{11} \cdot P_i + \beta_{12} \cdot E_i + \beta_{13} \cdot G_i + \beta_{14} \cdot P_i \cdot E_i + \beta_{15} \cdot P_i \cdot G_i + \beta_{16} \cdot E_i \cdot G_i) \cdot t_{ij} + e_{ij}$$
 
@@ -243,7 +245,7 @@ resid.1 = data.frame(esclerosis, pred = fitted(m_media), resid = resid(m_media, 
 # "Residuos estandarizados vs valores predichos"
 
 graf_3 <- ggplot(data = resid.1) +
-  geom_point(aes(x = pred, y = resid), color = 'darkcyan') +
+  geom_point(aes(x = pred, y = resid), color = '#34c77b') +
   geom_hline(yintercept = 0) +
   geom_hline(yintercept = c(-3, 3), linetype = 2) +
   scale_x_continuous("Valores predichos") +
@@ -255,9 +257,6 @@ graf_3 <- ggplot(data = resid.1) +
 
 # Evaluación de la ESTRUCTURA DE COVARIANCIA
 # Variograma de los residuos de Cholesky
-
-# Como no se considera correlación en los datos
-# Residuos Cholesky = residuos estandarizados
 
 resid.1 = data.frame(resid.1, residChol = resid(m_media, type = 'n'))
 
@@ -278,6 +277,7 @@ gridExtra::grid.arrange(graf_3, graf_4, nrow=2)
 ```
 
 En el gráfico de residuos vemos una variación constante asi que podríamos asumir que el supuesto de homocedasticidad se cumple (se observa un outlier por fuera del -3); además vemos que hay mucho error de medición, muy poca correlación serial y poca variabilidad entre individuos.
+
 Debemos agregar un efecto aleatorio, en particular una ordenada aleatoria (más adelante evaluaremos si es necesaría agregar también una pendiente aleatoria).Por lo que el modelo quedaría así:
 
 $$Y_{ij} = \beta_0 + \beta_{01} \cdot P_i + \beta_{02} \cdot E_i + b_{0i} + (\beta_{1} + \beta_{11} \cdot P_i + \beta_{12} \cdot E_i + \beta_{13} \cdot G_i + \beta_{14} \cdot P_i \cdot E_i + \beta_{15} \cdot P_i \cdot G_i + \beta_{16} \cdot E_i \cdot G_i) \cdot t_{ij} + e_{ij}$$
@@ -297,14 +297,14 @@ vgm2 = data.frame(vgm$svar)
 
 ggplot(data = vgm2, aes(x = vt, y = vv)) +
   geom_point(color = 'grey50', na.rm = TRUE) +
-  geom_smooth(method = 'loess', se = FALSE, span = 1) +
+  geom_smooth(method = 'loess',colour = "#f16f3b", se = FALSE, span = 1, linewidth = 1.5) +
   geom_hline(yintercept = 1) +
   theme_light() +
   scale_x_continuous("Rezago", breaks = seq(0, 18, 3)) +
   scale_y_continuous("Variograma muestral") +
   coord_cartesian(ylim = c(0, 1.5)) + 
   labs(title = "Variograma muestral") +
-  theme(plot.title = element_text(size = 15)) 
+  theme(plot.title = element_text(size = 12)) 
 ```
 
 Está bastante muy cerca del 1; aún asi podríamos probar las estructuras de correlación serial (pese a que sabemos que no hay mucha) y comparar los AIC.
@@ -326,7 +326,7 @@ vgm3 = data.frame(vgm$svar)
 
 ggplot(data = vgm3, aes(x = vt, y = vv)) +
   geom_point(color = 'grey50', na.rm = TRUE) +
-  geom_smooth(method = 'loess', se = FALSE, span = 1) +
+  geom_smooth(method = 'loess',colour = "#f16f3b", se = FALSE, span = 1) +
   geom_hline(yintercept = 1) +
   scale_x_continuous("Rezago", breaks = seq(0, 18, 3)) +
   scale_y_continuous("Variograma muestral") +
@@ -351,7 +351,7 @@ vgm4 = data.frame(vgm$svar)
 
 ggplot(data = vgm4, aes(x = vt, y = vv)) +
   geom_point(color = 'grey50', na.rm = TRUE) +
-  geom_smooth(method = 'loess', se = FALSE, span = 1) +
+  geom_smooth(method = 'loess',colour = "#f16f3b", se = FALSE, span = 1) +
   geom_hline(yintercept = 1) +
   theme_light() +
   scale_x_continuous("Rezago", breaks = seq(0, 18, 3)) +
@@ -360,11 +360,9 @@ ggplot(data = vgm4, aes(x = vt, y = vv)) +
   labs(title = "Variograma muestral") +
   theme(plot.title = element_text(size = 15)) 
 
-# Esta creo que se va mucho respecto a la otras.
-
 
 # Comparación:
-anova(m1, m2, m3) # nos quedamos con el que tendria estructura de simetria compuesta (m1)
+anova(m1, m2, m3) 
 ```
 
 Decidimos que nos quedamos con el modelo con ordenada aleatoria y cuya estructura de covariancia es la Simetría Compuesta; ahora, a ese modelo, se le agrega una pendiente aleatoria y se comparan ambos modelos.
@@ -383,7 +381,7 @@ vgm5 = data.frame(vgm$svar)
 
 ggplot(data = vgm5, aes(x = vt, y = vv)) +
   geom_point(color = 'grey50', na.rm = TRUE) +
-  geom_smooth(method = 'loess', se = FALSE, span = 1) +
+  geom_smooth(method = 'loess',colour = "#f16f3b", se = FALSE, span = 1) +
   geom_hline(yintercept = 1) +
   theme_light() +
   scale_x_continuous("Rezago", breaks = seq(0, 18, 3)) +
@@ -396,22 +394,43 @@ ggplot(data = vgm5, aes(x = vt, y = vv)) +
 anova(m1, m4)
 ```
 
-El modelos sin pendiente aleatoria resulta ser el de menor AIC, por lo que podemos asumir que las variancias son constantes a través del tiempo. ¿Lo serán entre grupos? Se plantea un modelo con variancias distintas entre grupos y se lo compara con el modelo de variancias comunes.
+El modelos sin pendiente aleatoria resulta ser el de menor AIC, por lo que podemos asumir que las variancias son constantes a través del tiempo,¿Lo serán entre grupos? 
+Se plantea un modelo con variancias distintas entre grupos y se lo compara con el modelo de variancias comunes.
 
 ```{r}
 m5 <- lme(afcr ~ 1 + previo + edad + mes + previo:mes + edad:mes + grupo:mes +
             previo:edad:mes + previo:grupo:mes + edad:grupo:mes,
-          random = ~ 1|id, 
+          random = ~ 1|id, method = "REML",
           weights = varIdent(form = ~ 1|grupo),
           data = esclerosis)
 summary(m5)
 
-anova(m1, m5) # Modelo final: solo ordenada aleat y variancias iguales entre grupos.
+anova(m1, m5) 
 ```
+
+Nuevamente, el ajuste no mejora; nos seguimos quedando con el modelo que solo tiene ordenada aleatoria.
+
+Como última instancia, evaluamos si el modelo en realidad debe ser cuadrático en lugar de lineal; para eso, se agrega el tiempo al cuadrado.
+
+```{r}
+esclerosis <- mutate(esclerosis, mes2 = mes^2)
+
+m6 <- lme(afcr ~ 1 + previo + edad + mes + previo:mes + edad:mes + grupo:mes +
+            previo:edad:mes + previo:grupo:mes + edad:grupo:mes + mes2 + previo:mes2 +
+            edad:mes2 + grupo:mes2 + previo:edad:mes2 + previo:grupo:mes2 +
+            edad:grupo:mes2,
+          random = ~ 1|id, method = "REML",
+          data = esclerosis)
+
+# Comparación:
+anova(m1, m6)
+```
+
+El modelo lineal está bien, por lo que el modelo final seleccionado es el propuesto al inicio: ordenada aleatoria y variancia común por grupo y tiempo.
 
 ## Análisis de residuos.
 
-Se extraen los residuos condicionales y marginales estandarizados, los marginales de CHolesky y los valores predichos condicionales y marginales para evaluar que el modela realmente sea adecuado.
+Se extraen los residuos condicionales y marginales estandarizados, los marginales de CHolesky y los valores predichos condicionales y marginales para evaluar que el modelo realmente sea adecuado.
 
 ```{r}
 residuos <- data.frame(esclerosis,
@@ -429,7 +448,7 @@ Se prueba haciendo un gráfico de "residuos marginales estandarizados vs. Tiempo
 
 ```{r}
 ggplot(data = residuos, aes(x = mes, y = res_marg_est)) +
-  geom_point(color = 'darkcyan') +
+  geom_point(color = '#34c77b') +
   geom_hline(yintercept = 0) +
   scale_x_continuous("Valores predichos") +
   scale_y_continuous("Residuos marginales estandarizados", breaks = seq(-10, 10, 1)) +
@@ -437,10 +456,10 @@ ggplot(data = residuos, aes(x = mes, y = res_marg_est)) +
   theme(plot.title = element_text(size = 15))
 ```
 
-No ningún patrón visible, entonces podemos decir que el modelo para la media esta bien planteado.
+No hay ningún patrón visible, entonces podemos decir que el modelo para la media esta bien planteado.
 
 
-- Nota: entre estos dos gráficos va el Variograma con los residuos de Cholesky para ver la estrcutura de covariancia (ya está hecho, y mostrado, al principio)
+Aclaración: entre estos dos gráficos va el Variograma con los residuos de Cholesky para ver la estrcutura de covariancia (ya está hecho, y mostrado, al principio)
 
 ### Homocedasticidad
 
@@ -448,7 +467,7 @@ Se prueba con el gráfico "Res. condicionales estandarizados vs. Predichos"
 
 ```{r}
 ggplot(data = residuos) +
-  geom_point(aes(x = pred_cond, y = res_cond_est), color = 'darkcyan') +
+  geom_point(aes(x = pred_cond, y = res_cond_est), color = '#34c77b') +
   geom_hline(yintercept = 0) +
   geom_hline(yintercept = c(-3, 3), linetype = 2) +
   scale_x_continuous("Valores predichos") +
@@ -457,7 +476,7 @@ ggplot(data = residuos) +
   theme(plot.title = element_text(size = 15)) 
 ```
 
-Los puntos se observan distribuidos de manera aproximadamente aleatoria alrededor de cero y dentro de un rango constante (no patrón), si bien se observa un punto casi al limite (posible outlier) aun así podemos decir que el modelo para la variancia esta bien espeficado.
+Los puntos se observan distribuidos de manera aproximadamente aleatoria alrededor de cero y dentro de un rango constante (es decir, no hay patrón), si bien se observa un punto casi al limite (posible outlier) aun así podemos decir que el modelo para la variancia esta bien espeficado.
 
 
 ### Normalidad error condicional
@@ -468,9 +487,10 @@ Se prueba con un gráfico probabilistico normlar de los residuos condicionales e
 ggplot(data = residuos, aes(sample = res_cond_est)) +
   stat_qq_band(bandType = 'boot', fill = 'grey80') +
   stat_qq_line() + 
-  stat_qq_point(color = 'darkcyan') +
+  stat_qq_point(color = '#34c77b') +
   labs(x = 'Cuantiles teóricos', y = 'Residuos condicionales estandarizados',
-       title = 'Gráfico probabilistico normal de los residuos condicionales') 
+       title = 'Gráfico probabilistico normal de los residuos condicionales') +
+  theme(plot.title = element_text(size = 11)) 
 ```
 Hay normalidad pese a los puntos que se observan arriba.
 
@@ -479,24 +499,25 @@ Hay normalidad pese a los puntos que se observan arriba.
 Se prueba con un gráfico probilistico Chi-cuadrado de la distancia de Mahalanobis.
 
 ```{r}
-# Extraigo la matriz D -variancia de los b_i-
+# Extraemos la matriz D -variancia de los b_i-
 D <-  getVarCov(m1, type = "random.effects")
 M_i <- mahalanobis(ranef(m1), 0, D)
 M_i <- data.frame(id = esclerosis_a$id, M_i)
 
-# Defino la distribución y los g.l
+# Definimos la distribución y los g.l
 dist <- "chisq"
 gl <- list(df = 1)
 
 ggplot(data = M_i, aes(sample = M_i)) +
   stat_qq_band(distribution = dist, dparams = gl, fill = 'grey80') +
   stat_qq_line(distribution = dist, dparams = gl) + 
-  stat_qq_point(distribution = dist, dparams = gl, color = 'darkcyan') +
+  stat_qq_point(distribution = dist, dparams = gl, color = '#34c77b') +
   labs(x = 'Cuantiles teóricos', y = 'Distancia de Mahalanobis',
-       title = 'Gráfico probabilistico chi-cuadrado de la distancia de Mahalanobis')
+       title = 'Gráfico probabilistico chi-cuadrado de la distancia de Mahalanobis')+
+  theme(plot.title = element_text(size = 11)) 
 
 ```
-Se encuentran dentro de las bandas de confianza; el valor que se observa más alejado podria ser, again, una observacion atipica.
+Se encuentran dentro de las bandas de confianza; el valor que se observa más alejado podria ser, tal vez, una observacion atipica.
 
 ### Outliers
 
@@ -507,16 +528,17 @@ Se pueden detectar 2 tipos de outliers: observaciones y perfiles.
 El gráfico que mejor los detecta es el de "Res. condicionales estudentizados vs. N° de observaciones".
 
 ```{r}
+# Agregamos los identificadores de observaciones
 residuos <-  mutate(residuos, obs = 1:847)
+
 ggplot(data = residuos) +
-  geom_point(aes(x = obs, y = res_cond_est), color = 'darkcyan') +
+  geom_point(aes(x = obs, y = res_cond_est), color = '#34c77b') +
   geom_hline(yintercept = 0) +
   scale_x_continuous("Observación") +
   scale_y_continuous("Residuos condicinales estandarizados", breaks = seq(-6, 6, 1)) +
   coord_cartesian(ylim = c(-3, 3)) +
   labs(title = "Residuos condicionales estandarizados vs tiempo") +
   theme(plot.title = element_text(size = 15))
-
 ```
 Se observa un solo punto al borde del limite del intervalo considerado para los residuos (casi -3).
 
@@ -526,7 +548,7 @@ Se detectan a través de un gráfico que plantea "Dist. de Mahalanobis vs. id".
 
 ```{r}
 ggplot(data = M_i) +
-  geom_point(aes(x = id, y = M_i), color = 'darkcyan') +
+  geom_point(aes(x = id, y = M_i), color = '#34c77b') +
   geom_hline(yintercept = 0) +
   theme_light() +
 #  scale_x_continuous("Individuo") +
@@ -535,19 +557,20 @@ ggplot(data = M_i) +
   theme(plot.title = element_text(size = 15))
 ```
 Vemos que hay 3 individuos cuyos perfiles se alejan de los demás.
+
 Veamos, cuáles son.
 
 ```{r}
 ggplot() + 
   geom_line(data = esclerosis, mapping = aes(x = mes, y = afcr, group = id), 
-            size = 0.5, na.rm = T, color = 'grey50') +
-  geom_point(size = 0.5, na.rm = T, color = 'grey50') +
+            size = 0.5, na.rm = T, color = 'grey') +
+  geom_point(size = 0.5, na.rm = T, color = 'grey') +
   geom_line(data = filter(esclerosis,id == 127), mapping = aes(x = mes, y = afcr), 
-            size = 0.5, na.rm = T, color = 'orangered') +
+            size = 0.5, na.rm = T, color = '#f16f3b') +
   geom_line(data = filter(esclerosis,id == 109), mapping = aes(x = mes,y = afcr), 
-            size = 0.5, na.rm = T, color = 'green') +
+            size = 0.5, na.rm = T, color = '#34c77b') +
   geom_line(data = filter(esclerosis,id == 55), mapping = aes(x = mes, y = afcr), 
-            size = 0.5, na.rm = T, color = 'blue') +
+            size = 0.5, na.rm = T, color = '#63B8FF') +
   facet_wrap(~ grupo) +
   scale_x_continuous("Mes", breaks = seq(0, 18, 3)) +
   scale_y_continuous("Medidad de autoinmunidad") +
@@ -559,6 +582,8 @@ Si bien las distancias de Mahalanobis de estos 3 individuos se alejan de las dem
 
 ## Test de hipótesis
 
+Recordemos que el modelo:
+
 $$
 Y_{ij} = \beta_0 + \beta_{01} \cdot P_i + \beta_{02} \cdot E_i + (\beta_{1} + \beta_{11} \cdot P_i + \beta_{12} \cdot E_i + \beta_{13} \cdot G_i + \beta_{14} \cdot P_i \cdot E_i + \beta_{15} \cdot P_i \cdot G_i + \beta_{16} \cdot E_i \cdot G_i) \cdot t_{ij} + e_{ij}
 $$
@@ -567,27 +592,20 @@ $$
 
 ¿El nivel medio de AFCR antes de comenzar el tratamiento está asociado con la edad del paciente o el hecho de haber recibido tratamiento previo con esas drogas?
 
-Esto se traduce en que $H_0) \beta_{01} = 0$ por un lado; y $H_0) \beta_{02} = 0$ por otro
+Entonces queremos probar que $H_0) \beta_{01} = \beta_{02} = 0$
 
 ```{r}
 # Re-ajusto el modelo con Maxima Verosimilitud
 m1 <- update(m1, method = "ML", data = esclerosis)
 
-m1_1 <- update(m1, fixed = ~ 1 + previo + mes + previo:mes +
-                 edad:mes + grupo:mes + previo:mes +
-                 previo:edad:mes + previo:grupo:mes +
-                 edad:grupo:mes,
-               data = esclerosis)
-
-m1_2 <- update(m1, fixed = ~ 1 + edad + mes + previo:mes + edad:mes + grupo:mes + 
+m1_1 <- update(m1, fixed = ~ 1 + mes + previo:mes +edad:mes + grupo:mes + 
                  previo:mes + previo:edad:mes + previo:grupo:mes + edad:grupo:mes,
                data = esclerosis)
 
 anova(m1, m1_1) #Rechazo H0 
-anova(m1, m1_2) # Rechazo H0 
 ```
 
-Como rechazamos ambas hipótesis, el nivel de AFCR antes de iniciar el tratamiento se ve afectado por la Edad y por el tratamiento Previo.
+Como rechazamos la hipótesis nula, entonces el nivel de AFCR antes de iniciar el tratamiento se ve afectado por la Edad y por el tratamiento Previo.
 
 ### Hipótesis 2
 
@@ -605,7 +623,7 @@ m1_3 <- update(m1, fixed = ~ 1 + previo + edad + mes + previo:mes + edad:mes +
 anova(m1, m1_3) #Rechazo H0  
 ```
 
-La tasa de cambio típica difiere entre ambos Grupos (tratamientos)
+Rechazamos H0), la tasa de cambio típica difiere entre ambos Grupos (tratamientos)
 
 ### Hipótesis 3
 
