@@ -611,10 +611,6 @@ La tasa de cambio típica difiere entre ambos Grupos (tratamientos)
 
 ¿La tasa de cambio del nivel medio de AFCR depende de la edad del paciente y/o el hecho de haber recibido tratamiento previo con alguna de estas drogas?
 
-#### Forma Agus
-
-Creo que no hace falta probar primero el efecto interacción
-
 Las hipótesis a probar son:
 
  - $H_0) \beta_{12} = \beta_{14} = \beta_{16} = 0$ para la Edad.
